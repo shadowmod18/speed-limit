@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compteur de Vitesse avec Limite</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #f0f0f0, #c0c0c0);
+        }
+
+        .container {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        #speed {
+            font-size: 3em;
+            margin-top: 20px;
+            transition: color 0.5s, transform 0.5s;
+        }
+
+        #speedLimit {
+            font-size: 2em;
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 120px;
+            height: 120px;
+            border: 8px solid red;
+            border-radius: 50%;
+            background-color: white;
+            color: red;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .exceeded {
+            color: red;
+            transform: scale(1.1);
+        }
+
+        .speedometer {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border: 10px solid #333;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fff, #ddd);
+            margin: 20px auto;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .needle {
+            position: absolute;
+            width: 4px;
+            height: 100px;
+            background: red;
+            top: 50%;
+            left: 50%;
+            transform-origin: bottom;
+            transform: rotate(0deg);
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .speed-label {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            top: 60%;
+            font-size: 1.5em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Compteur de Vitesse</h1>
+        <div class="speedometer">
+            <div class="needle" id="needle"></div>
+            <div class="speed-label" id="speed">0 km/h</div>
+        </div>
+        <div id="speedLimit">N/A</div>
+    </div>
+    <script>
+        const apiKey = 'VOTRE_CLE_API_HERE_MAPS';
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(updateSpeed, showError, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 5000
+            });
+        } else {
+            alert("La géolocalisation n'est pas supportée par ce navigateur.");
+        }
+
+        function updateSpeed(position) {
+            const speed = position.coords.speed; // vitesse en m/s
+            const speedKmh = (speed * 3.6).toFixed(2); // conversion en km/h
+            const speedElement = document.getElementById('speed');
+            const needleElement = document.getElementById('needle');
+            speedElement.innerText = speedKmh + ' km/h';
+
+            const rotation = (speedKmh / 240) * 180; // assuming max speed is 240 km/h
+            needleElement.style.transform = `rotate(${rotation}deg)`;
+
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            getSpeedLimit(lat, lon, speedKmh);
+        }
+
+        function getSpeedLimit(lat, lon, currentSpeed) {
+            const url = `https://fleet.ls.hereapi.com/2/calculateroute.json?apiKey=${apiKey}&waypoint0=${lat},${lon}&mode=fastest;car;traffic:disabled`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.response.route[0].leg[0].link[0].speedLimit) {
+                        const speedLimit = data.response.route[0].leg[0].link[0].speedLimit;
+                        const speedLimitElement = document.getElementById('speedLimit');
+                        speedLimitElement.innerText = speedLimit + ' km/h';
+
+                        const speedElement = document.getElementById('speed');
+                        if (currentSpeed > speedLimit) {
+                            speedElement.classList.add('exceeded');
+                        } else {
+                            speedElement.classList.remove('exceeded');
+                        }
+                    } else {
+                        document.getElementById('speedLimit').innerText = 'N/A';
+                    }
+                })
+                .catch(error => console.error('Erreur:', error));
+        }
+
+        function showError(error) {
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    alert("L'utilisateur a refusé la demande de géolocalisation.");
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    alert("Les informations de localisation sont indisponibles.");
+                    break;
+                case error.TIMEOUT:
+                    alert("La demande de localisation a expiré.");
+                    break;
+                case error.UNKNOWN_ERROR:
+                    alert("Une erreur inconnue est survenue.");
+                    break;
+            }
+        }
+    </script>
+</body>
+</html>
